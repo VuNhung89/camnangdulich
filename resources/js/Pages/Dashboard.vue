@@ -1,79 +1,46 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { ref, onMounted, computed } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import Header from '@/Components/Header.vue';
 import Footer from '@/Components/Footer.vue';
 
-const stats = ref({
-  users: 0,
-  posts: 0,
-  tours: 0,
-  bookings: 0,
-  hotels: 0,
-  locations: 0,
-  events: 0,
-  videos: 0,
-  comments: 0,
-  ratings: 0,
-  likes: 0,
-  pendingPosts: 0,
-});
+const user = computed(() => usePage().props.auth.user);
+const stats = ref({ users: 0, posts: 0, tours: 0, bookings: 0, hotels: 0, locations: 0, events: 0, videos: 0, comments: 0, ratings: 0, likes: 0, pendingPosts: 0 });
 const posts = ref([]);
 const currentPage = ref(1);
 const lastPage = ref(1);
 const perPage = 10;
 const loading = ref(true);
 
-onMounted(async () => {
-  const token = localStorage.getItem('auth_token');
-  if (!token) {
-    router.visit('/login');
-    return;
-  }
-  try {
-    const userRes = await axios.get('/api/user', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (userRes.data.role !== 'admin') {
-      router.visit('/');
-      return;
-    }
-    await fetchData();
-  } catch (err) {
-    console.error('Lỗi tải dữ liệu:', err);
-    if (err.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      router.visit('/login');
-    }
-  } finally {
-    loading.value = false;
-  }
-});
-
 const fetchData = async () => {
   try {
     const [statsRes, postsRes] = await Promise.all([
-      axios.get('/api/admin/stats', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      }),
-      axios.get('/api/posts/pending', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-        params: { page: currentPage.value, per_page: perPage },
-      }),
+      axios.get('/api/admin/stats'),
+      axios.get('/api/posts/pending', { params: { page: currentPage.value, per_page: perPage } }),
     ]);
     stats.value = statsRes.data;
     posts.value = postsRes.data.data;
     currentPage.value = postsRes.data.current_page;
     lastPage.value = postsRes.data.last_page;
   } catch (err) {
-   console.error('Lỗi API:', {
-      status: err.response?.status,
-      data: err.response?.data,
-      message: err.message,
-    });
+    console.error('Lỗi API:', err);
+  } finally {
+    loading.value = false;
   }
 };
+
+onMounted(async () => {
+  if (!user.value) {
+    router.visit('/login');
+    return;
+  }
+  if (user.value.role !== 'admin') {
+    router.visit('/');
+    return;
+  }
+  await fetchData();
+});
 
 const goToPage = (page) => {
   if (page >= 1 && page <= lastPage.value) {
@@ -84,9 +51,7 @@ const goToPage = (page) => {
 
 const approvePost = async (postId) => {
   try {
-    await axios.put(`/api/posts/${postId}/approve`, {}, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-    });
+    await axios.put(`/api/posts/${postId}/approve`);
     posts.value = posts.value.filter(post => post.id !== postId);
     stats.value.pendingPosts--;
   } catch (err) {
@@ -97,9 +62,7 @@ const approvePost = async (postId) => {
 const rejectPost = async (postId) => {
   if (confirm('Bạn chắc chắn muốn xóa bài viết này?')) {
     try {
-      await axios.delete(`/api/posts/${postId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      });
+      await axios.delete(`/api/posts/${postId}`);
       posts.value = posts.value.filter(post => post.id !== postId);
       stats.value.pendingPosts--;
     } catch (err) {

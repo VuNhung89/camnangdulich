@@ -14,10 +14,10 @@
         <!-- Hình ảnh -->
         <div v-if="tour.image">
           <img
-            :src="tour.image"
+            :src="fullImage(tour.image)"
             alt="Hình ảnh tour"
             class="w-full h-96 object-cover rounded-lg"
-            @error="event => event.target.src = '/image/placeholder.jpg'"
+            @error="event => event.target.src = fallbackImg"
           />
         </div>
 
@@ -32,15 +32,16 @@
           <!-- Giá -->
           <div>
             <h2 class="text-2xl font-semibold text-gray-800">Giá</h2>
-            <p class="text-gray-600 mt-2">{{ tour.price.toLocaleString('vi-VN') }} VND</p>
+            <p class="text-gray-600 mt-2">
+              {{ tour.price ? tour.price.toLocaleString('vi-VN') + ' VND' : 'Chưa rõ' }}
+            </p>
           </div>
 
           <!-- Thời gian -->
           <div>
             <h2 class="text-2xl font-semibold text-gray-800">Thời gian</h2>
             <p class="text-gray-600 mt-2">
-              Từ {{ new Date(tour.start_date).toLocaleDateString('vi-VN') }} 
-              đến {{ new Date(tour.end_date).toLocaleDateString('vi-VN') }}
+              Từ {{ formatDate(tour.start_date) }} đến {{ formatDate(tour.end_date) }}
             </p>
           </div>
 
@@ -48,7 +49,10 @@
           <div v-if="tour.location">
             <h2 class="text-2xl font-semibold text-gray-800">Địa điểm</h2>
             <p class="text-gray-600 mt-2">
-              <a :href="`/locations/${tour.location.id}`" class="text-blue-500 hover:underline">
+              <a
+                :href="`/locations/${tour.location.id}`"
+                class="text-blue-500 hover:underline"
+              >
                 {{ tour.location.name }}
               </a>
             </p>
@@ -80,6 +84,7 @@ export default {
   setup(props) {
     const tour = ref({});
     const loading = ref(true);
+    const fallbackImg = '/images/placeholder.jpg';
 
     const fetchTour = async () => {
       try {
@@ -92,9 +97,18 @@ export default {
       }
     };
 
+    const fullImage = (path) => {
+      if (!path) return fallbackImg;
+      return path.startsWith('http') ? path : `http://localhost:8000${path}`;
+    };
+
+    const formatDate = (date) => {
+      return date ? new Date(date).toLocaleDateString('vi-VN') : 'Không rõ';
+    };
+
     onMounted(fetchTour);
 
-    return { tour, loading };
+    return { tour, loading, fallbackImg, fullImage, formatDate };
   }
 };
 </script>
